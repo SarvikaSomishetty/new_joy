@@ -10,7 +10,7 @@ import bcrypt from 'bcrypt';
 
 dotenv.config();
 const app = express();
-const port = process.env.PORT || 5001;
+const port = process.env.PORT || 5000;
 
 
 
@@ -924,13 +924,17 @@ app.get('/api/emotion', (req, res) => {
 
 app.get('/api/wordlists', async (req, res) => {
   try {
-    const wordLists = await WordList.find();
+    const wordLists = await WordList.find(); // Only one expected
+    
+
+    // Wrap it in an array to match frontend expectations
     res.status(200).json(wordLists);
   } catch (error) {
     console.error('Error fetching word lists:', error);
     res.status(500).json({ error: 'Failed to fetch word lists' });
   }
 });
+
 
 // Add face-api related endpoints
 app.post('/api/faceapi-emotion', (req, res) => {

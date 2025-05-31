@@ -10,7 +10,7 @@ const FAQ = () => {
       e.preventDefault();
   
       try {
-        const response = await fetch('http://localhost:5001/api/add-faq', {
+        const response = await fetch('http://localhost:5000/api/add-faq', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
