@@ -759,17 +759,24 @@ app.post('/api/delete-child', async (req, res) => {
 app.post('/api/change-password', async (req, res) => {
   try {
     const { username, currentPassword, newPassword } = req.body;
-    
+    console.log(currentPassword, newPassword);
     if (!username || !currentPassword || !newPassword) {
       return res.status(400).json({ error: "All fields are required" });
     }
-    
-    const therapist = await Therapist.findOne({ username, password: currentPassword });
+      const therapist = await Therapist.findOne({ username });
     if (!therapist) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-    
-    therapist.password = newPassword;
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, therapist.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Hash the new password before saving
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    therapist.password = hashedNewPassword;
     await therapist.save();
     
     res.json({ 
