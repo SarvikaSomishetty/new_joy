@@ -635,7 +635,50 @@ const Game = () => {
   };
 
   // --- Adjust Difficulty Logic (Migrated from Game2.tsx) ---
-  const adjustDifficulty = async () => {
+  // const adjustDifficulty = async () => {
+  //   let newLevel = parseInt(currentLevel);
+  //   let newWordIndex = wordIndex + 1;
+  //   let nextTheme = currentTheme;
+
+  //   // Track last two answers for level adjustment
+  //   const updatedAnswers = [...lastTwoAnswers, completed ? '✅' : '❌'].slice(-2);
+  //   setLastTwoAnswers(updatedAnswers);
+  //   console.log('🎮 Last two answers (in adjustDifficulty):', updatedAnswers.join(' '));
+    
+  //   if (updatedAnswers.length === 2) {
+  //     const [prev, curr] = updatedAnswers;
+  //     if (prev === '✅' && curr === '✅' && newLevel < 3) {
+  //       newLevel++;
+  //       // console.log('📈 Level increased to:', newLevel);
+  //     } else if (prev === '❌' && curr === '❌' && newLevel > 1) {
+  //       newLevel--;
+  //       // console.log('📉 Level decreased to:', newLevel);
+  //     }
+  //   }
+
+  //   // "Bad" emotions trigger a theme change
+  //   // Use the existing 'emotion' state variable, which is updated asynchronously
+  //   let detectedEmotion = emotion || 'neutral'; // Use the state variable 'emotion'
+  //   console.log('Using detected emotion for theme logic:', detectedEmotion);
+  
+  //   const stayInSameThemeEmotions = ['Happiness', 'surprise', 'neutral']; // Added neutral to stay
+  //   const switchThemeEmotions = ['fear', 'anger', 'disgust','sad'];
+
+  //   // Normalize detected emotion for comparison
+  //   const normalizedDetectedEmotion = detectedEmotion.toLowerCase();
+
+  //   if (switchThemeEmotions.includes(normalizedDetectedEmotion)) {
+  //     const availableThemes = themes.filter(t => t !== nextTheme);
+  //     // console.log('Available themes for switch:', availableThemes, 'Length:', availableThemes.length); // Added log
+
+  //     if (availableThemes.length > 0) {
+  //       nextTheme = availableThemes[Math.floor(Math.random() * availableThemes.length)];
+  //       console.log(`Emotion '${detectedEmotion}' triggered theme switch. New theme: ${nextTheme}`);
+  //     } else {
+  //        console.log(`Emotion '${detectedEmotion}' detected, but no other themes available to switch.`);
+  //     }
+  //   }
+const adjustDifficulty = async () => {
     let newLevel = parseInt(currentLevel);
     let newWordIndex = wordIndex + 1;
     let nextTheme = currentTheme;
@@ -661,12 +704,12 @@ const Game = () => {
     let detectedEmotion = emotion || 'neutral'; // Use the state variable 'emotion'
     console.log('Using detected emotion for theme logic:', detectedEmotion);
   
-    const stayInSameThemeEmotions = ['happy', 'surprise', 'neutral']; // Added neutral to stay
+    const stayInSameThemeEmotions = ['Happiness', 'surprise', 'neutral']; // Added neutral to stay
     const switchThemeEmotions = ['fear', 'anger', 'disgust','sad'];
 
     // Normalize detected emotion for comparison
     const normalizedDetectedEmotion = detectedEmotion.toLowerCase();
-
+    console.log('Normalized detected emotion:',normalizedDetectedEmotion);
     if (switchThemeEmotions.includes(normalizedDetectedEmotion)) {
       const availableThemes = themes.filter(t => t !== nextTheme);
       // console.log('Available themes for switch:', availableThemes, 'Length:', availableThemes.length); // Added log
@@ -678,7 +721,6 @@ const Game = () => {
          console.log(`Emotion '${detectedEmotion}' detected, but no other themes available to switch.`);
       }
     }
-
     // Track theme transition no matter what (use nextTheme)
     await trackThemeChange(nextTheme);
     // Track emotion (use the detectedEmotion)
@@ -866,10 +908,17 @@ const Game = () => {
         setShowConfetti(true);
         setScore(prev => (prev < 10 ? prev + 1 : prev));
         
+        const updatedAnswers = [...lastTwoAnswers, '✅'].slice(-2);
+        setLastTwoAnswers(updatedAnswers);
+        console.log('🎮 Last two answers:', updatedAnswers.join(' '));
       } else {
         setIncorrectStreak(is => is + 1);
         setCorrectStreak(0);
         setShowWrongMessage(true);
+        
+        const updatedAnswers = [...lastTwoAnswers, '❌'].slice(-2);
+        setLastTwoAnswers(updatedAnswers);
+        console.log('🎮 Last two answers:', updatedAnswers.join(' '));
         
         setTimeout(() => {
           setSelected([]);
