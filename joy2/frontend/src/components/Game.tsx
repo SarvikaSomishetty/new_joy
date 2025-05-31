@@ -1039,7 +1039,6 @@ const Game = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
       <div
         className="relative flex-grow w-full overflow-hidden"
         style={
@@ -1049,6 +1048,7 @@ const Game = () => {
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
+                backgroundAttachment: 'fixed',
                 width: '100vw',
                 height: '100vh',
                 minHeight: '100vh',
@@ -1060,9 +1060,10 @@ const Game = () => {
               }
             : {
                 backgroundImage: `url('/images/${currentTheme}.jpg')`,
-                backgroundSize: '100vw 100vh',
+                backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
+                backgroundAttachment: 'fixed',
                 backgroundColor: 'lightblue',
                 width: '100vw',
                 height: '100vh',
@@ -1076,13 +1077,13 @@ const Game = () => {
         }
       >
         {/* Subtle overlay for readability */}
-        <div
+{/*         <div
           className="absolute inset-0 z-0 pointer-events-none overflow-hidden"
           style={{
             background: 'linear-gradient(120deg, rgba(255,255,255,0.10) 0%, rgba(161,140,209,0.08) 100%)',
             mixBlendMode: 'lighten',
           }}
-        ></div>
+        ></div> */}
         <video 
           ref={videoRef} 
           style={{ display: 'none' }} 
@@ -1103,7 +1104,7 @@ const Game = () => {
         />
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-        {!showThemeComplete && (
+{/*         {!showThemeComplete && (
           <div
             className="absolute inset-0 z-0 pointer-events-none overflow-hidden"
             style={{
@@ -1114,12 +1115,12 @@ const Game = () => {
               backgroundColor: 'lightblue',
             }}
           ></div>
-        )}
+        )} */}
         <div
           className={`relative z-10 flex flex-col items-center justify-center min-h-screen p-8 ${
             showThemeComplete ? 'bg-transparent' : ''
           }`}
-          style={{ paddingTop: 120 }} // Add top padding to prevent overlap
+          style={{ paddingTop: 80px }} // Add top padding to prevent overlap
         >
           {showConfetti && (
             <Confetti
@@ -1307,7 +1308,7 @@ const Game = () => {
 
           {/* Score and Puzzles Played Counter */}
           {!showThemeComplete && (
-            <div className="fixed top-6 left-6 z-30 flex flex-col items-start bg-white/80 px-4 py-2 rounded-xl shadow-lg text-sm min-w-[120px] max-w-[180px]">
+            <div className="fixed top-20 left-6 z-30 flex flex-col items-start bg-white/80 px-4 py-2 rounded-xl shadow-lg text-sm min-w-[120px] max-w-[180px]">
               <span className="font-bold text-purple-700">Puzzles Played: {playedCount} / {totalPuzzles}</span>
               <span className="font-bold text-green-700">Score: {score}</span>
             </div>
