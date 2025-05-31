@@ -92,7 +92,7 @@ const Game = () => {
     const fetchWordLists = async () => {
       try {
         console.log('Fetching word lists...');
-        const response = await axios.get('http://localhost:5001/api/wordlists');
+        const response = await axios.get('http://localhost:5000/api/wordlists');
 
         // Update validation to expect an array with an object containing wordLists
         if (!response.data || !Array.isArray(response.data) || response.data.length === 0 || !response.data[0] || !response.data[0].wordLists) {
@@ -353,7 +353,7 @@ const Game = () => {
             await trackEmotion(emotion);
             console.log('Emotion detected (FaceAPI): ', emotion);
             try {
-              await fetch('http://localhost:5001/api/faceapi-emotion', {
+              await fetch('http://localhost:5000/api/faceapi-emotion', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ emotion })
@@ -394,7 +394,7 @@ const Game = () => {
               setDetectionStatus(`Face detected with ${flattenedLandmarks.length} landmarks`);
               
               try {
-                const response = await fetch('http://localhost:5001/api/facemesh-landmarks', {
+                const response = await fetch('http://localhost:5000/api/facemesh-landmarks', {
                   method: 'POST',
                   headers: { 
                     'Content-Type': 'application/json',
@@ -473,7 +473,7 @@ const Game = () => {
       lastSentRef.current = now;
       const sendLandmarksToBackend = async () => {
         try {
-          const response = await fetch('http://localhost:5001/api/facemesh-landmarks', {
+          const response = await fetch('http://localhost:5000/api/facemesh-landmarks', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -556,7 +556,7 @@ const Game = () => {
     const { username, therapistCode } = JSON.parse(childData);
     try {
       // Update the emotion on the server
-      const url = 'http://localhost:5001/api/track-emotion';
+      const url = 'http://localhost:5000/api/track-emotion';
       const options = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -584,7 +584,7 @@ const Game = () => {
     if (!childData) return;
     const { username, therapistCode } = JSON.parse(childData);
     try {
-      await fetch('http://localhost:5001/api/track-theme-change', {
+      await fetch('http://localhost:5000/api/track-theme-change', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -611,7 +611,7 @@ const Game = () => {
     if (!childData) return;
     const { username, therapistCode } = JSON.parse(childData);
     try {
-      await fetch('http://localhost:5001/api/update-played-puzzles', {
+      await fetch('http://localhost:5000/api/update-played-puzzles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -662,7 +662,7 @@ const Game = () => {
     console.log('Using detected emotion for theme logic:', detectedEmotion);
   
     const stayInSameThemeEmotions = ['happy', 'surprise', 'neutral']; // Added neutral to stay
-    const switchThemeEmotions = ['fear', 'angry', 'disgust','sad'];
+    const switchThemeEmotions = ['fear', 'anger', 'disgust','sad'];
 
     // Normalize detected emotion for comparison
     const normalizedDetectedEmotion = detectedEmotion.toLowerCase();
@@ -866,17 +866,10 @@ const Game = () => {
         setShowConfetti(true);
         setScore(prev => (prev < 10 ? prev + 1 : prev));
         
-        const updatedAnswers = [...lastTwoAnswers, '✅'].slice(-2);
-        setLastTwoAnswers(updatedAnswers);
-        console.log('🎮 Last two answers:', updatedAnswers.join(' '));
       } else {
         setIncorrectStreak(is => is + 1);
         setCorrectStreak(0);
         setShowWrongMessage(true);
-        
-        const updatedAnswers = [...lastTwoAnswers, '❌'].slice(-2);
-        setLastTwoAnswers(updatedAnswers);
-        console.log('🎮 Last two answers:', updatedAnswers.join(' '));
         
         setTimeout(() => {
           setSelected([]);
