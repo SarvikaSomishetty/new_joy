@@ -46,6 +46,7 @@ const TherapistDashboard: React.FC = () => {
   const [passwordChangeMessage, setPasswordChangeMessage] = useState('');
   const [deleteConfirmChild, setDeleteConfirmChild] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const navigate = useNavigate();
 
   // Set background and get therapist data
@@ -304,14 +305,47 @@ const TherapistDashboard: React.FC = () => {
 
   if (loading) return <LoadingContainer>Loading...</LoadingContainer>;
   if (error) return <ErrorContainer>Error: {error}</ErrorContainer>;
-  
+
   return (
     <Container>
       <Header>
         <Title>THERAPIST DASHBOARD</Title>
-        <LogoutButton onClick={handleLogout}>Logout</LogoutButton>
+        <HeaderActions>
+          <ChangePasswordButton onClick={() => setShowChangePassword(true)}>
+            Change Password
+          </ChangePasswordButton>
+          <LogoutButton onClick={handleLogout}>Logout</LogoutButton>
+        </HeaderActions>
       </Header>
-  
+
+      {/* Change Password Popup Modal */}
+      {showChangePassword && (
+        <ChangePasswordModalOverlay>
+          <ChangePasswordModal>
+            <ModalCloseButton onClick={() => setShowChangePassword(false)}>×</ModalCloseButton>
+            <SectionHeader>
+              <h2>Change Password</h2>
+            </SectionHeader>
+            <InputGroup>
+              <Input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Current Password"
+              />
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="New Password"
+              />
+              <Button onClick={handleChangePassword}>Change Password</Button>
+            </InputGroup>
+            {passwordChangeMessage && <ErrorMessage>{passwordChangeMessage}</ErrorMessage>}
+          </ChangePasswordModal>
+        </ChangePasswordModalOverlay>
+      )}
+
       <InfoSection>
         <InfoCard>
           <h3>Your Therapist Code</h3>
@@ -319,7 +353,7 @@ const TherapistDashboard: React.FC = () => {
           <small>Share this code with your children to let them join</small>
         </InfoCard>
       </InfoSection>
-  
+
       <Section>
         <SectionHeader>
           <h2>Your Children</h2>
@@ -330,7 +364,7 @@ const TherapistDashboard: React.FC = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </SectionHeader>
-  
+
         <AddChildSection>
           <InputGroup>
             <Input
@@ -343,7 +377,7 @@ const TherapistDashboard: React.FC = () => {
           </InputGroup>
           {error && <ErrorMessage>{error}</ErrorMessage>}
         </AddChildSection>
-  
+
         {filteredChildren.length === 0 ? (
           <EmptyState>No children found</EmptyState>
         ) : (
@@ -584,28 +618,6 @@ const TherapistDashboard: React.FC = () => {
             ))}
           </ChildrenGrid>
         )}
-      </Section>
-
-      <Section>
-        <SectionHeader>
-          <h2>Change Password</h2>
-        </SectionHeader>
-        <InputGroup>
-          <Input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Current Password"
-          />
-          <Input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="New Password"
-          />
-          <Button onClick={handleChangePassword}>Change Password</Button>
-        </InputGroup>
-        {passwordChangeMessage && <ErrorMessage>{passwordChangeMessage}</ErrorMessage>}
       </Section>
 
       {deleteConfirmChild && (
@@ -1277,6 +1289,80 @@ const ConfirmDeleteButton = styled.button`
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  gap: 16px;
+  align-items: center;
+`;
+
+const ChangePasswordButton = styled.button`
+  background: #5a7af0;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 0;
+  margin-right: 0;
+  transition: background 0.2s, transform 0.2s;
+  &:hover {
+    background: #4a67cc;
+    transform: translateY(-2px);
+  }
+`;
+
+// Popup modal overlay for change password
+const ChangePasswordModalOverlay = styled.div`
+  position: fixed;
+  z-index: 3000;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const ChangePasswordModal = styled.div`
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 8px 40px rgba(90, 122, 240, 0.18);
+  padding: 36px 28px 28px 28px;
+  min-width: 340px;
+  max-width: 95vw;
+  min-height: 220px;
+  position: relative;
+  animation: fadeInScale 0.25s;
+
+  @keyframes fadeInScale {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+`;
+
+const ModalCloseButton = styled.button`
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #888;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.2s;
+  &:hover {
+    color: #e74c3c;
   }
 `;
 

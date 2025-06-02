@@ -1,5 +1,5 @@
-import { useRef,useState, useEffect } from 'react';
-import { useParams, useNavigate,useLocation } from 'react-router-dom';
+import { useRef, useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Confetti from 'react-confetti';
 import { ArrowRight, Home, AlertCircle, Trophy, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -7,8 +7,6 @@ import axios from 'axios';
 import * as tf from '@tensorflow/tfjs';
 // @ts-expect-error: No types for facemesh
 import * as facemesh from '@tensorflow-models/facemesh';
-import { EmotionModel } from '../faceapi/types';
-import { loadFaceApi } from '../faceapi/index';
 import Header from './Header';
 import Footer from './Footer';
 
@@ -29,9 +27,6 @@ type WordLists = {
 type Params = Record<string, string | undefined>;
 
 const totalPuzzles = 10;
-
-// Add CDN model URL and retry logic for FaceAPI model loading
-const MODEL_CDN_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 
 const Game = () => {
   // --- Routing/params ---
@@ -70,8 +65,7 @@ const Game = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [modelType, setModelType] = useState<'face-api' | 'facemesh'>('facemesh');
-  const [model, setModel] = useState<EmotionModel | null>(null);
+  const [model, setModel] = useState<any>(null);
   const [modelStatus, setModelStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [emotion, setEmotion] = useState<string | null>(null);
   const [detectionStatus, setDetectionStatus] = useState<string>('');
@@ -291,37 +285,24 @@ const Game = () => {
     };
   }, []); // Empty dependency array since we want this to run once on mount
 
-  // In the model loading effect, use loadFaceApi for face-api
+  // --- Model loading: facemesh only ---
   useEffect(() => {
     let isMounted = true;
     const loadModel = async () => {
       setModelStatus('loading');
       try {
-        if (modelType === 'face-api') {
-          console.group('🔍 Face Detection Models');
-          const faceApiModel = await loadFaceApi();
-          if (!isMounted) return;
-          setModel(faceApiModel);
-          setModelStatus('ready');
-          console.log('✅ All models loaded successfully');
-          console.groupEnd();
-        } else {
-          console.group('🔍 Face Detection Models');
-          await tf.ready();
-          const faceMeshModel = await facemesh.load({
-            maxFaces: 1,
-            refineLandmarks: true,
-            mesh: true
-          });
-          if (!isMounted) return;
-          setModel({
-            type: 'facemesh',
-            estimateFaces: faceMeshModel.estimateFaces.bind(faceMeshModel)
-          });
-          setModelStatus('ready');
-          console.log('✅ All models loaded successfully');
-          console.groupEnd();
-        }
+        await tf.ready();
+        const faceMeshModel = await facemesh.load({
+          maxFaces: 1,
+          refineLandmarks: true,
+          mesh: true
+        });
+        if (!isMounted) return;
+        setModel({
+          type: 'facemesh',
+          estimateFaces: faceMeshModel.estimateFaces.bind(faceMeshModel)
+        });
+        setModelStatus('ready');
       } catch (error) {
         console.error('Model loading error:', error);
         if (isMounted) {
@@ -332,9 +313,9 @@ const Game = () => {
     };
     loadModel();
     return () => { isMounted = false; };
-  }, [modelType]);
+  }, []);
 
-  // In the detection effect, use model.detectEmotion for face-api
+  // --- Detection: facemesh only ---
   useEffect(() => {
     if (!model || !videoRef.current || !isVideoReady) return;
     let stop = false;
@@ -345,54 +326,20 @@ const Game = () => {
           setTimeout(detect, 200);
           return;
         }
-        if (modelType === 'face-api' && model && 'detectEmotion' in model) {
-          const emotion = await model.detectEmotion(videoRef.current);
-          if (emotion) {
-            setEmotion(emotion);
-            setDetectionStatus(`Detected: ${emotion}`);
-            await trackEmotion(emotion);
-            console.log('Emotion detected (FaceAPI): ', emotion);
-            try {
-              await fetch('http://localhost:5000/api/faceapi-emotion', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ emotion })
-              });
-            } catch (err) {
-              console.error('Failed to send FaceAPI emotion to backend:', err);
-            }
-          } else {
-            setEmotion(null);
-            setDetectionStatus('No face detected');
-          }
-        } else if (modelType === 'facemesh' && model && 'estimateFaces' in model) {
+        if (model && 'estimateFaces' in model) {
           const predictions = await model.estimateFaces(videoRef.current);
           if (predictions.length > 0) {
             const now = Date.now();
             if (now - lastSentRef.current > 3000) { // 3 seconds
               lastSentRef.current = now;
               const rawLandmarks = predictions[0].scaledMesh;
-              
-              // Process the 3D points into a flat array
-              const flattenedLandmarks = rawLandmarks.reduce((acc: number[], point: number[]) => {
-                // Each point is [x, y, z], so we spread all coordinates into the accumulator
-                return [...acc, ...point];
-              }, []);
-              
-              // Validate landmarks
+              const flattenedLandmarks = rawLandmarks.reduce((acc: number[], point: number[]) => [...acc, ...point], []);
               if (!flattenedLandmarks || !Array.isArray(flattenedLandmarks) || flattenedLandmarks.length !== 1404) {
-                console.error('Invalid landmarks format:', {
-                  length: flattenedLandmarks?.length,
-                  firstPoint: rawLandmarks[0],
-                  flattenedFirstPoint: flattenedLandmarks?.slice(0, 3)
-                });
                 setDetectionStatus('Invalid landmarks format');
                 return;
               }
-
               setLandmarks(flattenedLandmarks);
               setDetectionStatus(`Face detected with ${flattenedLandmarks.length} landmarks`);
-              
               try {
                 const response = await fetch('http://localhost:5000/api/facemesh-landmarks', {
                   method: 'POST',
@@ -403,8 +350,7 @@ const Game = () => {
                   body: JSON.stringify({ landmarks: flattenedLandmarks })
                 });
                 if (!response.ok) {
-                  const errorData = await response.json();
-                  throw new Error(`HTTP error! status: ${response.status}, details: ${JSON.stringify(errorData)}`);
+                  return;
                 }
                 const data = await response.json();
                 if (data.emotion) {
@@ -430,14 +376,13 @@ const Game = () => {
     };
     detect();
     return () => { stop = true; };
-  }, [model, modelType, isVideoReady]);
+  }, [model, isVideoReady]);
 
-  // Draw facemesh landmarks for debugging (hidden canvas)
+  // --- Draw facemesh landmarks for debugging (hidden canvas) ---
   useEffect(() => {
     if (!model || !videoRef.current || !canvasRef.current) return;
-    if (modelType !== 'facemesh') return;
     if (!('estimateFaces' in model)) return;
-    const facemeshModel = model as facemesh.FaceMesh;
+    const facemeshModel = model;
     let stop = false;
     const drawLandmarks = async () => {
       if (stop) return;
@@ -463,9 +408,9 @@ const Game = () => {
     };
     drawLandmarks();
     return () => { stop = true; };
-  }, [model, modelType]);
+  }, [model]);
 
-  // Throttle backend facemesh landmark requests
+  // --- Throttle backend facemesh landmark requests ---
   useEffect(() => {
     if (landmarks.length > 0) {
       const now = Date.now();
@@ -473,7 +418,7 @@ const Game = () => {
       lastSentRef.current = now;
       const sendLandmarksToBackend = async () => {
         try {
-          const response = await fetch('http://localhost:5000/api/facemesh-landmarks', {
+          await fetch('http://localhost:5000/api/facemesh-landmarks', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -634,8 +579,8 @@ const Game = () => {
     }
   };
 
-  // --- Adjust Difficulty Logic (Migrated from Game2.tsx) ---
-  const adjustDifficulty = async () => {
+  
+const adjustDifficulty = async () => {
     let newLevel = parseInt(currentLevel);
     let newWordIndex = wordIndex + 1;
     let nextTheme = currentTheme;
@@ -661,12 +606,12 @@ const Game = () => {
     let detectedEmotion = emotion || 'neutral'; // Use the state variable 'emotion'
     console.log('Using detected emotion for theme logic:', detectedEmotion);
   
-    const stayInSameThemeEmotions = ['happy', 'surprise', 'neutral']; // Added neutral to stay
+    const stayInSameThemeEmotions = ['Happiness', 'surprise', 'neutral']; // Added neutral to stay
     const switchThemeEmotions = ['fear', 'anger', 'disgust','sad'];
 
     // Normalize detected emotion for comparison
     const normalizedDetectedEmotion = detectedEmotion.toLowerCase();
-
+    console.log('Normalized detected emotion:',normalizedDetectedEmotion);
     if (switchThemeEmotions.includes(normalizedDetectedEmotion)) {
       const availableThemes = themes.filter(t => t !== nextTheme);
       // console.log('Available themes for switch:', availableThemes, 'Length:', availableThemes.length); // Added log
@@ -678,7 +623,6 @@ const Game = () => {
          console.log(`Emotion '${detectedEmotion}' detected, but no other themes available to switch.`);
       }
     }
-
     // Track theme transition no matter what (use nextTheme)
     await trackThemeChange(nextTheme);
     // Track emotion (use the detectedEmotion)
@@ -866,10 +810,15 @@ const Game = () => {
         setShowConfetti(true);
         setScore(prev => (prev < 10 ? prev + 1 : prev));
         
+        const updatedAnswers = [...lastTwoAnswers, '✅'].slice(-2);
+        
       } else {
         setIncorrectStreak(is => is + 1);
         setCorrectStreak(0);
         setShowWrongMessage(true);
+        
+        const updatedAnswers = [...lastTwoAnswers, '❌'].slice(-2);
+        
         
         setTimeout(() => {
           setSelected([]);
@@ -905,8 +854,6 @@ const Game = () => {
       return; // Prevent proceeding if data isn't ready
     }
 
-    // adjustDifficulty logic is now integrated and expanded below
-    
     setShowConfetti(false);
 
     // The check for totalPuzzles and setShowThemeComplete is now handled within the adjusted difficulty/puzzle selection logic
@@ -965,11 +912,6 @@ const Game = () => {
     sessionStorage.removeItem('playedPuzzles');
     
     navigate('/');
-  };
-
-  // --- Toggle model button ---
-  const handleToggleModel = () => {
-    setModelType((prev) => (prev === 'face-api' ? 'facemesh' : 'face-api'));
   };
 
   // --- Render ---
@@ -1039,6 +981,7 @@ const Game = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <Header />
       <div
         className="relative flex-grow w-full overflow-hidden"
         style={
@@ -1048,7 +991,6 @@ const Game = () => {
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
-                backgroundAttachment: 'fixed',
                 width: '100vw',
                 height: '100vh',
                 minHeight: '100vh',
@@ -1060,10 +1002,9 @@ const Game = () => {
               }
             : {
                 backgroundImage: `url('/images/${currentTheme}.jpg')`,
-                backgroundSize: 'cover',
+                backgroundSize: '100vw 100vh',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
-                backgroundAttachment: 'fixed',
                 backgroundColor: 'lightblue',
                 width: '100vw',
                 height: '100vh',
@@ -1077,13 +1018,13 @@ const Game = () => {
         }
       >
         {/* Subtle overlay for readability */}
-{/*         <div
+        <div
           className="absolute inset-0 z-0 pointer-events-none overflow-hidden"
           style={{
             background: 'linear-gradient(120deg, rgba(255,255,255,0.10) 0%, rgba(161,140,209,0.08) 100%)',
             mixBlendMode: 'lighten',
           }}
-        ></div> */}
+        ></div>
         <video 
           ref={videoRef} 
           style={{ display: 'none' }} 
@@ -1104,7 +1045,7 @@ const Game = () => {
         />
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-{/*         {!showThemeComplete && (
+        {!showThemeComplete && (
           <div
             className="absolute inset-0 z-0 pointer-events-none overflow-hidden"
             style={{
@@ -1115,12 +1056,12 @@ const Game = () => {
               backgroundColor: 'lightblue',
             }}
           ></div>
-        )} */}
+        )}
         <div
           className={`relative z-10 flex flex-col items-center justify-center min-h-screen p-8 ${
             showThemeComplete ? 'bg-transparent' : ''
           }`}
-          style={{ paddingTop: 80px }} // Add top padding to prevent overlap
+          style={{ paddingTop: 120 }} // Add top padding to prevent overlap
         >
           {showConfetti && (
             <Confetti
@@ -1151,23 +1092,6 @@ const Game = () => {
             <X />
           </motion.button>
 
-          {/* Model toggle button - only show if game is not over */}
-          {!showThemeComplete && (
-            <div className="absolute top-20 right-6 flex flex-col gap-2 z-30 w-[220px] max-w-[90vw]">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={handleToggleModel}
-                className={buttonClass}
-                disabled={status === 'loading'}
-              >
-                {status === 'loading' 
-                  ? 'Loading...' 
-                  : `${modelType === 'face-api' ? 'FaceAPI' : 'Facemesh'} (Change)`}
-              </motion.button>
-            </div>
-          )}
-
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1193,6 +1117,12 @@ const Game = () => {
             )}
 
             <div className="flex-1 flex flex-col items-center justify-center">
+              {/* --- Instruction added here --- */}
+              {!showThemeComplete && (
+                <div className="mb-2 text-sm text-purple-700 font-semibold">
+                  Drag across the letters to play!
+                </div>
+              )}
               <AnimatePresence>
                 {showWrongMessage && (
                   <motion.div
@@ -1243,6 +1173,7 @@ const Game = () => {
                       ))
                     )}
                   </div>
+                  
                   <motion.div className="mt-8 text-center">
                     {showWrongMessage && (
                       <h2 className="text-2xl font-bold text-red-500 mb-4">Try Again! ❌</h2>
@@ -1259,7 +1190,6 @@ const Game = () => {
                     >
                       Next <ArrowRight size={20} />
                     </motion.button>
-
                   </motion.div>
                 </>
               )}
@@ -1308,13 +1238,14 @@ const Game = () => {
 
           {/* Score and Puzzles Played Counter */}
           {!showThemeComplete && (
-            <div className="fixed top-20 left-6 z-30 flex flex-col items-start bg-white/80 px-4 py-2 rounded-xl shadow-lg text-sm min-w-[120px] max-w-[180px]">
+            <div className="fixed top-6 left-6 z-30 flex flex-col items-start bg-white/80 px-4 py-2 rounded-xl shadow-lg text-sm min-w-[120px] max-w-[180px]">
               <span className="font-bold text-purple-700">Puzzles Played: {playedCount} / {totalPuzzles}</span>
               <span className="font-bold text-green-700">Score: {score}</span>
             </div>
           )}
         </div>
       </div>
+      {/* Removed: Made with Joyverse */}
       <Footer />
     </div>
   );

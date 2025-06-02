@@ -12,22 +12,12 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-
-
-
-
 const generateNumericCode = customAlphabet('0123456789', 6);
 
 // Enable CORS for all routes
 app.use(cors());
 app.use(bodyParser.json());
 
-// Test endpoint
-app.get('/api/test', (req, res) => {
-  res.json({
-    message: 'Server is running!',
-  });
-});
 
 // MongoDB connection (use 127.0.0.1 for compatibility)
 mongoose.connect('mongodb://127.0.0.1:27017/joyverse', {
@@ -39,15 +29,6 @@ mongoose.connect('mongodb://127.0.0.1:27017/joyverse', {
   console.error('MongoDB connection error:', err);
 });
 
-// Invitation Code Schema (New)
-const invitationSchema = new mongoose.Schema({
-  code: { type: String, required: true, unique: true },
-  isUsed: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now },
-  usedBy: { type: String, default: null },
-  usedAt: { type: Date, default: null }
-});
-const Invitation = mongoose.model('Invitation', invitationSchema);
 
 // Therapist Schema
 const therapistSchema = new mongoose.Schema({
@@ -139,118 +120,78 @@ const generateUniqueCode = async () => {
 // Generate a unique session ID
 const generateSessionId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
-// API endpoint to create invitation codes (Admin only)
-app.post('/api/create-invitation', async (req, res) => {
-  try {
-    const { adminKey } = req.body;
-    
-    // A secure admin key should be used in production
-    if (adminKey !== 'admin-secret-key') {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-    
-    // Use fixed invitation code 'joyversetherapist'
-    const code = 'joyversetherapist';
-    
-    // Check if this code already exists
-    const existingCode = await Invitation.findOne({ code });
-    if (existingCode) {
-      return res.status(400).json({ 
-        message: 'Fixed invitation code already exists',
-        code: code
-      });
-    }
-    
-    const newInvitation = new Invitation({ code });
-    await newInvitation.save();
-    
-    res.status(201).json({ 
-      message: 'Invitation code created successfully',
-      code: newInvitation.code
-    });
-  } catch (error) {
-    console.error('Error creating invitation code:', error);
-    res.status(500).json({ message: 'Internal server error' });
+const code = await generateUniqueCode();
+
+app.post('/api/superadmin/login', (req, res) => {
+  const { username, password } = req.body;
+
+  // Replace with your actual Super Admin credentials
+  const SUPER_ADMIN_USERNAME = 'admin';
+  const SUPER_ADMIN_PASSWORD = 'admin123';
+
+  if (username === SUPER_ADMIN_USERNAME && password === SUPER_ADMIN_PASSWORD) {
+    res.json({ message: 'Super Admin login successful' });
+  } else {
+    res.status(401).json({ message: 'Invalid credentials' });
   }
 });
 
-// API endpoint to list all invitation codes (Admin only)
-app.get('/api/invitations', async (req, res) => {
-  try {
-    const { adminKey } = req.query;
-    
-    if (adminKey !== 'admin-secret-key') {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-    
-    const invitations = await Invitation.find();
-    res.status(200).json(invitations);
-  } catch (error) {
-    console.error('Error fetching invitations:', error);
-    res.status(500).json({ message: 'Internal server error' });
+app.post('/api/superadmin/register-therapist', authenticateSuperAdmin, async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Username and password are required' });
   }
-});
 
-// Therapist Signup
-app.post('/api/signup', async (req, res) => {
-  console.log("Request body:", req.body);
   try {
-    const { username, password, invitationCode } = req.body;
-
-    // Check if the username already exists
-    const existing = await Therapist.findOne({ username });
-    if (existing) return res.status(400).json({ message: 'User already exists' });
-
-    // Validate the invitation code - accept both the fixed code and any existing valid codes
-    const fixedCode = 'joyversetherapist';
-    let invitation;
-
-    if (invitationCode === fixedCode) {
-      // Check if fixed code exists in database, if not create it
-      invitation = await Invitation.findOne({ code: fixedCode });
-      if (!invitation) {
-        invitation = new Invitation({ code: fixedCode });
-        await invitation.save();
-      }
-    } else {
-      // Check for other valid invitation codes
-      invitation = await Invitation.findOne({ code: invitationCode });
-      if (!invitation) {
-        return res.status(403).json({ message: 'Invalid invitation code' });
-      }
-      
-      // Check if non-fixed invitation code has already been used
-      if (invitation.code !== fixedCode && invitation.isUsed) {
-        return res.status(403).json({ message: 'Invitation code has already been used' });
-      }
-    }
-
-    // Generate therapist code
+    // Generate a unique code for the therapist
     const code = await generateUniqueCode();
 
-    // Create therapist
-    const newTherapist = new Therapist({ 
-      username, 
-      password, 
-      code,
-      invitationCodeUsed: invitationCode 
-    });
-    await newTherapist.save();
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Mark invitation as used (note: fixed code can be used multiple times)
-    if (invitation.code !== fixedCode) {
-      invitation.isUsed = true;
-    }
-    invitation.usedBy = invitationCode === fixedCode ? `${invitation.usedBy || ''}${username}, ` : username;
-    invitation.usedAt = new Date();
-    await invitation.save();
+    // Create a new therapist
+    const therapist = new Therapist({ username, password: hashedPassword, code });
+    await therapist.save();
 
-    res.status(201).json({ message: 'Signup successful', username, code });
+    res.status(201).json({ message: 'Therapist registered successfully', code });
   } catch (error) {
-    console.error('Signup error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('Error registering therapist:', error);
+    res.status(500).json({ message: 'Failed to register therapist' });
   }
 });
+
+app.get('/api/superadmin/therapists', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const therapists = await Therapist.find({}, { username: 1, code: 1, _id: 1 }); // Fetch only necessary fields
+    res.status(200).json(therapists);
+  } catch (error) {
+    console.error('Error fetching therapists:', error);
+    res.status(500).json({ message: 'Failed to fetch therapists' });
+  }
+});
+
+app.delete('/api/superadmin/delete-therapist/:id', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const therapist = await Therapist.findByIdAndDelete(id);
+
+    if (!therapist) {
+      return res.status(404).json({ message: 'Therapist not found' });
+    }
+
+    res.status(200).json({ message: 'Therapist deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting therapist:', error);
+    res.status(500).json({ message: 'Failed to delete therapist' });
+  }
+});
+
+// Middleware to authenticate Super Admin
+function authenticateSuperAdmin(req, res, next) {
+  // Simply allow all requests to pass through
+  next();
+}
 
 
 // Therapist Login
@@ -668,22 +609,7 @@ app.post('/api/submit-feedback', async (req, res) => {
   }
 });
 
-// Get all feedback (admin only)
-app.get('/api/get-feedback', async (req, res) => {
-  try {
-    const { adminKey } = req.query;
-    
-    if (adminKey !== 'admin-secret-key') {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-    
-    const feedback = await Feedback.find().sort({ createdAt: -1 });
-    res.json({ feedback });
-  } catch (error) {
-    console.error('Error fetching feedback:', error);
-    res.status(500).json({ error: "Server error" });
-  }
-});
+
 
 // Add FAQ
 app.post('/api/add-faq', async (req, res) => {
@@ -789,76 +715,7 @@ app.post('/api/change-password', async (req, res) => {
   }
 });
 
-app.post('/api/superadmin/login', (req, res) => {
-  const { username, password } = req.body;
 
-  // Replace with your actual Super Admin credentials
-  const SUPER_ADMIN_USERNAME = 'admin';
-  const SUPER_ADMIN_PASSWORD = 'admin123';
-
-  if (username === SUPER_ADMIN_USERNAME && password === SUPER_ADMIN_PASSWORD) {
-    res.json({ message: 'Super Admin login successful' });
-  } else {
-    res.status(401).json({ message: 'Invalid credentials' });
-  }
-});
-
-app.post('/api/superadmin/register-therapist', authenticateSuperAdmin, async (req, res) => {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Username and password are required' });
-  }
-
-  try {
-    // Generate a unique code for the therapist
-    const code = await generateUniqueCode();
-
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create a new therapist
-    const therapist = new Therapist({ username, password: hashedPassword, code });
-    await therapist.save();
-
-    res.status(201).json({ message: 'Therapist registered successfully', code });
-  } catch (error) {
-    console.error('Error registering therapist:', error);
-    res.status(500).json({ message: 'Failed to register therapist' });
-  }
-});
-
-app.get('/api/superadmin/therapists', authenticateSuperAdmin, async (req, res) => {
-  try {
-    const therapists = await Therapist.find({}, { username: 1, code: 1, _id: 1 }); // Fetch only necessary fields
-    res.status(200).json(therapists);
-  } catch (error) {
-    console.error('Error fetching therapists:', error);
-    res.status(500).json({ message: 'Failed to fetch therapists' });
-  }
-});
-
-app.delete('/api/superadmin/delete-therapist/:id', authenticateSuperAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const therapist = await Therapist.findByIdAndDelete(id);
-
-    if (!therapist) {
-      return res.status(404).json({ message: 'Therapist not found' });
-    }
-
-    res.status(200).json({ message: 'Therapist deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting therapist:', error);
-    res.status(500).json({ message: 'Failed to delete therapist' });
-  }
-});
-
-// Middleware to authenticate Super Admin
-function authenticateSuperAdmin(req, res, next) {
-  // Simply allow all requests to pass through
-  next();
-}
 
 let currentPuzzleEmotions = [];
 
@@ -943,15 +800,7 @@ app.get('/api/wordlists', async (req, res) => {
 });
 
 
-// Add face-api related endpoints
-app.post('/api/faceapi-emotion', (req, res) => {
-  const { emotion } = req.body;
-  if (!emotion) {
-    return res.status(400).json({ error: 'No emotion provided' });
-  }
-  currentPuzzleEmotions.push(emotion);
-  res.json({ success: true });
-});
+
 
 // Start the server
 app.listen(port, () => {
