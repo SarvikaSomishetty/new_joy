@@ -355,7 +355,7 @@ const Game = () => {
                 const data = await response.json();
                 if (data.emotion) {
                   setEmotion(data.emotion);
-                  await trackEmotion(data.emotion);
+                  //await trackEmotion(data.emotion);
                   console.log('Emotion detected (Facemesh backend): ', data.emotion);
                 }
               } catch (error) {
@@ -601,11 +601,25 @@ const adjustDifficulty = async () => {
       }
     }
 
-    // "Bad" emotions trigger a theme change
-    // Use the existing 'emotion' state variable, which is updated asynchronously
-    let detectedEmotion = emotion || 'neutral'; // Use the state variable 'emotion'
+
+   let detectedEmotion = emotion || 'neutral'; // Use the state variable 'emotion'
     console.log('Using detected emotion for theme logic:', detectedEmotion);
+    try {
+      const res = await fetch('http://localhost:5000/api/emotion');
+      const data = await res.json();
+      detectedEmotion = data.emotion || 'neutral';
+      console.log('Detected Emotion:', emotion);
+    } catch (error) {
+      console.error('Failed to fetch emotion:', error);
+    }
+
+   /* // "Bad" emotions trigger a theme change
+    // Use the existing 'emotion' state variable, which is updated asynchronously
+   */
   
+
+
+
     const stayInSameThemeEmotions = ['Happiness', 'surprise', 'neutral']; // Added neutral to stay
     const switchThemeEmotions = ['fear', 'anger', 'disgust','sad'];
 
